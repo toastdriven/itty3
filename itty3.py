@@ -395,8 +395,11 @@ class App(object):
         raise RouteNotFound()
 
     def remove_route(self, method, path):
-        offset = self.find_route(method, path)
-        self._routes.pop(offset)
+        try:
+            offset = self.find_route(method, path)
+            self._routes.pop(offset)
+        except RouteNotFound:
+            pass
 
     def error_404(self, request):
         return self.render(request, "Not Found", status_code=404)
@@ -410,7 +413,7 @@ class App(object):
             def _wrapped(request, *args, **kwargs):
                 return func(request, *args, **kwargs)
 
-            self.add_route(GET, path, _wrapped)
+            self.add_route(method, path, _wrapped)
             return _wrapped
 
         return _wrapper
@@ -446,7 +449,9 @@ class App(object):
         if permanent:
             status_code = 301
 
-        return HttpResponse(body="", status_code=status_code)
+        resp = HttpResponse(body="", status_code=status_code)
+        resp.set_header("Location", url)
+        return resp
 
     def process_request(self, environ, start_response):
         request = HttpRequest.from_wsgi(environ)
