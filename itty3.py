@@ -284,11 +284,14 @@ class HttpResponse(object):
     def set_header(self, name, value):
         self.headers[name] = value
 
+        if name.lower() == "content-type":
+            self.content_type = value
+
     def write(self):
         if not self.start_response:
             raise ResponseFailed(
                 "{}.write called before being provided a callable".format(
-                    self.__name__
+                    self.__class__.__name__
                 )
             )
 
