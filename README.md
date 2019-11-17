@@ -23,6 +23,29 @@ if __name__ == "__main__":
     app.run()
 ```
 
+## Why?
+
+`itty3` is a micro-framework for serving web traffic. Prior to its inital
+release, `itty3` weighed in at just 500 lines of code.
+
+Granted, it builds on the shoulders of giants, using big chunks of the Python
+standard library. But it has no other external dependencies!
+
+Reasons for `itty3`:
+
+* Extremely lightweight
+* Fast to start working with
+* Easy to produce initial/toy services
+* Minimal boilerplate
+* Useful for places where you can't/don't have a full Python setup
+* Useful for including directly, like when you lack permissions
+* Works with a variety of WSGI servers, including Gunicorn
+
+If you need to produce a big application, you're probably better off with
+[Django](https://djangoproject.com/),
+[Flask](https://www.palletsprojects.com/p/flask/), or any of the other
+larger/more mature web frameworks. No pressure!
+
 ## Setup
 
 `pip install itty3` is what most people will want.
