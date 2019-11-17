@@ -1,0 +1,7 @@
+.. _philosophy:
+
+==========
+Philosophy
+==========
+
+TBD

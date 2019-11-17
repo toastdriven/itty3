@@ -343,13 +343,24 @@ class HttpRequest(object):
 
         for key, value in environ.items():
             if key.startswith("HTTP_"):
-                headers[key[5:]] = value
+                mangled_key = key[5:].replace("_", "-")
+                headers[mangled_key] = value
+
+        body = ""
+        wsgi_input = environ.get("wsgi.input", io.StringIO(""))
+        content_length = environ.get("CONTENT_LENGTH", 0)
+
+        if content_length not in ("", 0):
+            # StringIO & the built-in server have this attribute, but things
+            # like gunicorn do not. Give it our best effort.
+            if not getattr(wsgi_input, "closed", False):
+                body = wsgi_input.read(int(content_length))
 
         return cls(
             uri=wsgiref.util.request_uri(environ),
             method=environ.get("REQUEST_METHOD", GET),
             headers=headers,
-            body=environ.get("wsgi.input", io.StringIO()).read(),
+            body=body,
             scheme=wsgiref.util.guess_scheme(environ),
             port=environ.get("SERVER_PORT", "80"),
         )
@@ -362,6 +373,27 @@ class HttpRequest(object):
             str: The content-type header or "text/html" if it was absent.
         """
         return self.headers.get("Content-Type", HTML)
+
+    def _ensure_unicode(self, body):
+        raw_data = urllib.parse.parse_qs(body)
+        revised_data = {}
+
+        # `urllib.parse.parse_qs` can be a very BYTESTRING-Y BOI.
+        # Ensure all the keys/value are Unicode.
+        for key, value in raw_data.items():
+            if isinstance(key, bytes):
+                key = key.decode("utf-8")
+
+            if isinstance(value, bytes):
+                value = value.decode("utf-8")
+            elif isinstance(value, (list, tuple)):
+                value = [
+                    v.decode("utf-8") for v in value if isinstance(v, bytes)
+                ]
+
+            revised_data[key] = value
+
+        return revised_data
 
     @property
     def GET(self):
@@ -384,7 +416,7 @@ class HttpRequest(object):
         if self._POST is not None:
             return self._POST
 
-        self._POST = QueryDict(urllib.parse.parse_qs(self.body))
+        self._POST = QueryDict(self._ensure_unicode(self.body))
         return self._POST
 
     @property
@@ -959,7 +991,7 @@ class App(object):
         resp.start_response = start_response
         return resp.write()
 
-    def run(self, addr="", port=8000, debug=None):
+    def run(self, addr="127.0.0.1", port=8000, debug=None):
         """
         An included development/debugging server for running the `App`
         itself.
@@ -968,8 +1000,8 @@ class App(object):
         to exit the server.
 
         Args:
-            addr (str, Optional): The address to bind to. Defaults to `""`,
-                which is `0.0.0.0` or `localhost`.
+            addr (str, Optional): The address to bind to. Defaults to
+                `127.0.0.1`.
             port (int, Optional): The port to bind to. Defaults to `8000`.
             debug (bool, Optional): Whether the server should be run in a
                 debugging mode. If provided, this overrides the `App.debug`
