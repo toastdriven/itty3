@@ -128,3 +128,16 @@ class TestHttpRequest(unittest.TestCase):
 
         self.request.scheme = "https"
         self.assertTrue(self.request.is_secure())
+
+    def test_is_secure(self):
+        req = itty3.HttpRequest(
+            "/greet/",
+            itty3.POST,
+            body='{"hello": "world"}',
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+        )
+
+        self.assertEqual(req.json(), {"hello": "world"})
