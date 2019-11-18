@@ -68,7 +68,8 @@ class TestHttpRequest(unittest.TestCase):
             "HTTP_HOST": "example.com",
             "SERVER_PORT": "443",
             "PATH_INFO": "/secure/checkout",
-            "CONTENT_LENGTH": 18,
+            "CONTENT_LENGTH": "18",
+            "CONTENT_TYPE": "application/json",
         }
 
         req = itty3.HttpRequest.from_wsgi(mock_environ)
@@ -80,6 +81,7 @@ class TestHttpRequest(unittest.TestCase):
         self.assertEqual(req.path, "/secure/checkout")
         self.assertEqual(len(req.query), 0)
         self.assertEqual(req.fragment, "")
+        self.assertEqual(req.content_type(), "application/json")
 
     def test_content_type_simple(self):
         self.assertEqual(self.request.content_type(), "text/html")

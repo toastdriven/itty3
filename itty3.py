@@ -348,10 +348,25 @@ class HttpRequest(object):
                 present.
         """
         headers = {}
+        non_http_prefixed_headers = [
+            "CONTENT_TYPE",
+            "CONTENT_LENGTH",
+            # TODO: Maybe in the future, add support for...?
+            # 'GATEWAY_INTERFACE',
+            # 'REMOTE_ADDR',
+            # 'REMOTE_HOST',
+            # 'SCRIPT_NAME',
+            # 'SERVER_NAME',
+            # 'SERVER_PORT',
+            # 'SERVER_PROTOCOL'
+        ]
 
         for key, value in environ.items():
-            if key.startswith("HTTP_"):
-                mangled_key = key[5:].replace("_", "-")
+            mangled_key = key.replace("_", "-")
+
+            if key.startswith("HTTP-"):
+                headers[mangled_key[5:]] = value
+            elif key in non_http_prefixed_headers:
                 headers[mangled_key] = value
 
         body = ""
@@ -827,6 +842,38 @@ class App(object):
             status_code=status_code,
             headers=headers,
             content_type=content_type,
+        )
+
+    def render_json(
+        self, request, data, status_code=200, content_type=JSON, headers=None,
+    ):
+        """
+        A convenience method for creating a JSON `HttpResponse` object.
+
+        Args:
+            request (HttpRequest): The request being handled
+            data (dict/list): The Python data structure to be encoded as JSON
+            status_code (int, Optional): The HTTP status to return. Defaults
+                to `200`.
+            content_type (str, Optional): The `Content-Type` header to return
+                with the response. Defaults to `text/html`.
+            headers (dict, Optional): The HTTP headers to include on the
+                response. Defaults to empty headers.
+
+        Returns:
+            HttpResponse: The populated response object
+        """
+        kwargs = {}
+
+        if self.debug:
+            kwargs["indent"] = 4
+
+        return self.render(
+            request,
+            json.dumps(data, **kwargs),
+            status_code=status_code,
+            content_type=content_type,
+            headers=headers,
         )
 
     def redirect(self, request, url, permanent=False):

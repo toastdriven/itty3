@@ -91,6 +91,14 @@ class TestApp(unittest.TestCase):
         self.assertEqual(resp.content_type, itty3.HTML)
         self.assertEqual(resp.headers, {"Content-Type": "text/html"})
 
+    def test_render_json(self):
+        req = itty3.HttpRequest("/greet/?name=Daniel", "GET")
+        resp = self.app.render_json(req, {"greeting": "Hello, Daniel!"})
+        self.assertEqual(resp.body, '{"greeting": "Hello, Daniel!"}')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.content_type, itty3.JSON)
+        self.assertEqual(resp.headers, {"Content-Type": "application/json"})
+
     def test_error_404(self):
         req = itty3.HttpRequest("/greet/?name=Daniel", "GET")
         resp = self.app.error_404(req)
