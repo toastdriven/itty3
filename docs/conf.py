@@ -23,7 +23,9 @@ copyright = "2019, Daniel Lindsley"
 author = "Daniel Lindsley"
 
 # The full version, including alpha/beta/rc tags
-release = "1.0.0-alpha-2"
+import itty3
+
+release = itty3.get_version(full=True)
 
 
 # -- General configuration ---------------------------------------------------
