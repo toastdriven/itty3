@@ -129,7 +129,7 @@ class TestHttpRequest(unittest.TestCase):
         self.request.scheme = "https"
         self.assertTrue(self.request.is_secure())
 
-    def test_is_secure(self):
+    def test_json(self):
         req = itty3.HttpRequest(
             "/greet/",
             itty3.POST,
