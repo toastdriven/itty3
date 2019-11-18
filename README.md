@@ -65,8 +65,11 @@ New BSD
 ## Running Tests
 
 ```
-$ pip install pytest
+$ pip install pytest pytest-cov
 $ pytest tests
+
+# For code coverage
+$ pytest --cov=itty3 tests
 ```
 
 ## Building Docs
