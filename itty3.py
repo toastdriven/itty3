@@ -751,6 +751,11 @@ class App(object):
         self._routes = []
         self.debug = debug
 
+    def __call__(self, environ, start_response):
+        # Allows providing the `App` instance as the WSGI handler to
+        # many WSGI servers.
+        return self.process_request(environ, start_response)
+
     def add_route(self, method, path, func):
         """
         Adds a given HTTP method, URI path & view to the routing.

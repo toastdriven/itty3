@@ -1,7 +1,7 @@
 .. _troubleshooting:
 
-==============
-Troublshooting
-==============
+===============
+Troubleshooting
+===============
 
 TBD

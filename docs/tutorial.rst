@@ -328,15 +328,9 @@ First, install ``gunicorn``::
 
     $ pip install gunicorn
 
-Next, we'll add a bit of code to our ``app.py``, just above the
-``if __name__ == "__main__":`` line::
+Next, instead of running ``python app.py``, we'll run::
 
-    def run_server(environ, start_response):
-        return app.process_request(environ, start_response)
-
-Finally, instead of running ``python app.py``, we'll run::
-
-    $ gunicorn -w 1 -t 0 --reload app:run_server
+    $ gunicorn -w 1 -t 0 --reload app:app
 
 Now, whenever we change our ``app.py`` file, ``gunicorn`` will automatically
 reload the code. Now it'll always be serving the current code to our browser.
