@@ -1,0 +1,29 @@
+## Problem
+
+Please describe the issue you encountered. Include output or a traceback if
+possible.
+
+```
+# Traceback goes here
+```
+
+## Setup
+
+Python version:
+itty3 version (`itty3.get_version(full=True)`):
+OS:
+Any other libraries/setup:
+
+## Test Output
+
+```
+$ pytest tests
+
+# Include test output here.
+```
+
+## Licensing
+
+[ ] This work is either my own or from a compatibly licensed work. It is
+    **NOT** code copied from the Internet or other unlicensed sources. I
+    approve this to be licensed under the New BSD license as a contributor.

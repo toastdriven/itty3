@@ -1,0 +1,15 @@
+## Problem
+
+Please describe the issue you encountered. Include output or a traceback if
+possible.
+
+```
+# Traceback goes here
+```
+
+## Setup
+
+Python version:
+itty3 version (`itty3.get_version(full=True)`):
+OS:
+Any other libraries/setup:

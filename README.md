@@ -72,7 +72,7 @@ $ pytest tests
 ## Building Docs
 
 ```
-$ pip install sphinxcontrib-napoleon
+$ pip install -r docs/requirements.txt
 $ cd docs
 $ make html
 ```
