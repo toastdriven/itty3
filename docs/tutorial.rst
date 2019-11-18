@@ -29,6 +29,9 @@ your app file directly!).
 Regardless, ``itty3``'s only dependency is Python 3. It's been tested on
 Python 3.7.4+, but may work on older versions.
 
+Finally, you can find the complete source for this tutorial within
+the `examples/tutorial_todolist` directory of ``itty3``'s source code.
+
 Starting An App
 ===============
 

@@ -1,0 +1,86 @@
+<html>
+
+<head>
+    <title>My TODO List</title>
+    <style>
+        /* Just a quick reset & some basic styles. */
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            background-color: #CCCCCC;
+            text-align: center;
+        }
+
+        body {
+            background-color: #FFFFFF;
+            border-left: 2px solid #999999;
+            border-right: 2px solid #999999;
+            font-family: Helvetica, Arial, sans-serif;
+            font-size: 14px;
+            margin: 0 auto;
+            text-align: left;
+            width: 60%;
+            padding: 40px 20px;
+        }
+
+        h1,
+        h2,
+        h3 {
+            margin: 10px 0px;
+            font-family: Georgia, 'Times New Roman', Times, serif;
+        }
+
+        p {
+            display: block;
+            padding: 10px 0px;
+        }
+
+        ul {
+            display: block;
+            padding: 10px 0px;
+            list-style: none;
+        }
+
+        ul li {
+            border: 1px solid #EEEEEE;
+            padding: 5px;
+        }
+
+        ul li form {
+            display: inline;
+        }
+
+        ul li input {
+            margin: 0px 10px 0px 0px;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>My TODO List</h1>
+    </header>
+
+    <content>
+        <ul>
+            <!--
+                    We'll manually search/replace this out with string formatting.
+                    This is where a real template language would come in handy.
+                -->
+            {{ content }}
+        </ul>
+
+        <p>
+            <form method="post" action="/create/">
+                <label for="id_todo">Add TODO:</label>
+                <input type="text" id="id_todo" name="todo">
+                <input type="submit" value="Create">
+            </form>
+        </p>
+    </content>
+</body>
+
+</html>
