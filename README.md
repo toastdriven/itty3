@@ -61,3 +61,18 @@ your project & import it directly!
 ## License
 
 New BSD
+
+## Running Tests
+
+```
+$ pip install pytest
+$ pytest tests
+```
+
+## Building Docs
+
+```
+$ pip install sphinxcontrib-napoleon
+$ cd docs
+$ make html
+```
