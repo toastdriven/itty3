@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name="itty3",
-    version="1.0.0",
+    version="1.0.0-alpha",
     description=(
         "The itty-bitty Python web framework... "
         "**Now Rewritten For Python 3!**"
@@ -13,6 +13,7 @@ setup(
     author_email="daniel@toastdriven.com",
     url="http://github.com/toastdriven/itty3/",
     long_description=open("README.md", "r").read(),
+    long_description_content_type="text/markdown",
     py_modules=["itty3"],
     requires=[],
     install_requires=[],
