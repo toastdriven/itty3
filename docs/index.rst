@@ -15,7 +15,15 @@ Welcome to itty3's documentation!
    deploying
    troubleshooting
 
+.. toctree::
+   :maxdepth: 1
+   :caption: API Docs:
+
    reference/itty3
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Other Docs:
 
    philosophy
    contributing

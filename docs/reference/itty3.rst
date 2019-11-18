@@ -1,5 +1,5 @@
-itty3 module
-============
+API Documentation
+=================
 
 .. automodule:: itty3
    :members:
