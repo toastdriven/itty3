@@ -163,11 +163,13 @@ class TestApp(unittest.TestCase):
 
         self.mock_environ["wsgi.input"] = io.StringIO()
         self.mock_environ["REQUEST_METHOD"] = "GET"
-        self.mock_environ["PATH_INFO"] = "/app/uuid-close-enough/"
+        self.mock_environ[
+            "PATH_INFO"
+        ] = "/app/5fdd79e5-c417-42d7-8235-e7b6c6e10c06/"
         mock_sr = mock.Mock()
 
         resp = self.app.process_request(self.mock_environ, mock_sr)
-        self.assertEqual(resp, [b"Saw uuid-close-enough"])
+        self.assertEqual(resp, [b"Saw 5fdd79e5-c417-42d7-8235-e7b6c6e10c06"])
         mock_sr.assert_called_once_with(
             "200 OK", [("Content-Type", "text/html")]
         )
@@ -179,18 +181,22 @@ class TestApp(unittest.TestCase):
 
         self.mock_environ["wsgi.input"] = io.StringIO()
         self.mock_environ["REQUEST_METHOD"] = "POST"
-        self.mock_environ["PATH_INFO"] = "/app/uuid-close-enough/"
+        self.mock_environ[
+            "PATH_INFO"
+        ] = "/app/5fdd79e5-c417-42d7-8235-e7b6c6e10c06/"
         mock_sr = mock.Mock()
 
         resp = self.app.process_request(self.mock_environ, mock_sr)
-        self.assertEqual(resp, [b"Handled uuid-close-enough"])
+        self.assertEqual(
+            resp, [b"Handled 5fdd79e5-c417-42d7-8235-e7b6c6e10c06"]
+        )
         mock_sr.assert_called_once_with(
             "200 OK", [("Content-Type", "text/html")]
         )
         req_seen = self.mock_complex_view.call_args[0][0]
         app_id = self.mock_complex_view.call_args[1].get("app_id")
         self.assertEqual(req_seen.method, "POST")
-        self.assertEqual(app_id, "uuid-close-enough")
+        self.assertEqual(app_id, "5fdd79e5-c417-42d7-8235-e7b6c6e10c06")
 
     def test_process_request_not_found(self):
         self.setup_working_app()

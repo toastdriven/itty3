@@ -68,6 +68,7 @@ class TestHttpRequest(unittest.TestCase):
             "HTTP_HOST": "example.com",
             "SERVER_PORT": "443",
             "PATH_INFO": "/secure/checkout",
+            "CONTENT_LENGTH": 18,
         }
 
         req = itty3.HttpRequest.from_wsgi(mock_environ)

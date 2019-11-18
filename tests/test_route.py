@@ -47,9 +47,7 @@ class TestRoute(unittest.TestCase):
         self.assertEqual(self.route_3.func, self.mock_complex_view)
         self.assertEqual(
             self.route_3._regex,
-            re.compile(
-                "^/greet/(?P<name>[\\w\\d._-]+)/(?P<variant>[\\w\\d._-]+)/$"
-            ),
+            re.compile("^/greet/(?P<name>[^/]+)/(?P<variant>[\\d]+)/$"),
         )
         self.assertEqual(
             self.route_3._type_conversions, {"name": "str", "variant": "int"}
@@ -63,25 +61,35 @@ class TestRoute(unittest.TestCase):
         self.assertEqual(self.route_4.func, self.mock_complex_view)
         self.assertEqual(
             self.route_4._regex,
-            re.compile(
-                "^/greet/(?P<name>[\\w\\d._-]+)/(?P<variant>[\\w\\d._-]+)/$"
-            ),
+            re.compile("^/greet/(?P<name>[^/]+)/(?P<variant>[\\d]+)/$"),
         )
         self.assertEqual(
             self.route_4._type_conversions, {"name": "str", "variant": "int"}
         )
 
+    def test_get_re_for_type(self):
+        self.assertEqual(
+            self.route_1.get_re_for_type("str"), r"(?P<{var_name}>[^/]+)"
+        )
+        self.assertEqual(
+            self.route_1.get_re_for_type("int"), r"(?P<{var_name}>[\d]+)"
+        )
+        self.assertEqual(
+            self.route_1.get_re_for_type("float"),
+            r"(?P<{var_name}>[\d]+.[\d]+)",
+        )
+        self.assertEqual(
+            self.route_1.get_re_for_type("uuid"),
+            "(?P<{{var_name}}>{})".format(itty3.UUID_PATTERN),
+        )
+        self.assertEqual(
+            self.route_1.get_re_for_type("slug"),
+            r"(?P<{var_name}>[\w\d._-]+)",
+        )
+
     def test_create_re(self):
         regex, tc = self.route_1.create_re(self.complex_uri)
-        raw_re = (
-            "^"
-            "/app/(?P<app_id>[\\w\\d._-]+)/"
-            "(?P<title>[\\w\\d._-]+)/"
-            "version/"
-            "(?P<major_version>[\\w\\d._-]+)/"
-            "(?P<release>[\\w\\d._-]+)/"
-            "$"
-        )
+        raw_re = "^/app/(?P<app_id>[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12})/(?P<title>[\\w\\d._-]+)/version/(?P<major_version>[\\d]+)/(?P<release>[^/]+)/$"
         self.assertEqual(regex, re.compile(raw_re))
         self.assertEqual(
             tc,
@@ -118,7 +126,7 @@ class TestRoute(unittest.TestCase):
         )
 
         matches = {
-            "app_id": "abc-123-not-uuid",
+            "app_id": "5fdd79e5-c417-42d7-8235-e7b6c6e10c06",
             "title": "content_dinos",
             "major_version": "2",
             "release": "test",
@@ -127,7 +135,7 @@ class TestRoute(unittest.TestCase):
         self.assertEqual(
             matches,
             {
-                "app_id": "abc-123-not-uuid",
+                "app_id": "5fdd79e5-c417-42d7-8235-e7b6c6e10c06",
                 "title": "content_dinos",
                 "major_version": 2,
                 "release": "test",
@@ -135,7 +143,7 @@ class TestRoute(unittest.TestCase):
         )
 
     def test_extract_kwargs(self):
-        uri = "/app/abc-123-not-uuid/content_dinos/version/2/test/"
+        uri = "/app/5fdd79e5-c417-42d7-8235-e7b6c6e10c06/content_dinos/version/2/test/"
         route = itty3.Route("GET", self.complex_uri, self.mock_complex_view)
 
         # Sanity check.
@@ -152,7 +160,7 @@ class TestRoute(unittest.TestCase):
         self.assertEqual(
             route.extract_kwargs(uri),
             {
-                "app_id": "abc-123-not-uuid",
+                "app_id": "5fdd79e5-c417-42d7-8235-e7b6c6e10c06",
                 "title": "content_dinos",
                 "major_version": 2,
                 "release": "test",

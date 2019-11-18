@@ -15,7 +15,7 @@ import wsgiref.util
 
 
 __author__ = "Daniel Lindsley"
-__version__ = (1, 0, 0, "alpha")
+__version__ = (1, 0, 0, "alpha", 2)
 __license__ = "New BSD"
 
 
@@ -54,6 +54,14 @@ HTML = "text/html"
 JSON = "application/json"
 FORM = "application/x-www-form-urlencoded"
 AJAX = "X-Requested-With"
+
+UUID_PATTERN = (
+    r"[A-Fa-f0-9]{{8}}-"
+    r"[A-Fa-f0-9]{{4}}-"
+    r"[A-Fa-f0-9]{{4}}-"
+    r"[A-Fa-f0-9]{{4}}-"
+    r"[A-Fa-f0-9]{{12}}"
+)
 
 # Borrowed & modified from Django.
 RESPONSE_CODES = {
@@ -387,9 +395,15 @@ class HttpRequest(object):
             if isinstance(value, bytes):
                 value = value.decode("utf-8")
             elif isinstance(value, (list, tuple)):
-                value = [
-                    v.decode("utf-8") for v in value if isinstance(v, bytes)
-                ]
+                new_value = []
+
+                for v in value:
+                    if isinstance(v, bytes):
+                        v = v.decode("utf-8")
+
+                    new_value.append(v)
+
+                value = new_value
 
             revised_data[key] = value
 
@@ -429,7 +443,7 @@ class HttpRequest(object):
         if self._PUT is not None:
             return self._PUT
 
-        self._PUT = QueryDict(urllib.parse.parse_qs(self.body))
+        self._PUT = QueryDict(self._ensure_unicode(self.body))
         return self._PUT
 
     def is_ajax(self):
@@ -571,9 +585,9 @@ class Route(object):
     """
 
     known_types = [
+        "str",
         "int",
         "float",
-        "str",
         "uuid",
         "slug",
     ]
@@ -590,8 +604,37 @@ class Route(object):
     def __repr__(self):
         return str(self)
 
-    # FIXME: Method out all the typed RE replacements, to allow for
-    #   easy overrides & new additions.
+    def get_re_for_int(self):
+        return r"[\d]+"
+
+    def get_re_for_float(self):
+        return r"[\d]+.[\d]+"
+
+    def get_re_for_uuid(self):
+        return UUID_PATTERN
+
+    def get_re_for_slug(self):
+        return r"[\w\d._-]+"
+
+    def get_re_for_type(self, desired_type):
+        """
+        Fetches the correct regex for a given type.
+
+        Args:
+            desired_type (str): The provided type to get a regex for
+
+        Returns:
+            str: A raw string of the regex (minus the variable name)
+        """
+        pattern = r"[^/]+"
+        get_re_method_name = "get_re_for_{}".format(desired_type)
+        get_re_method = getattr(self, get_re_method_name, None)
+
+        if get_re_method is not None:
+            pattern = get_re_method()
+
+        regex_frag = r"(?P<{{var_name}}>{})".format(pattern)
+        return regex_frag
 
     def create_re(self, path):
         """
@@ -623,8 +666,11 @@ class Route(object):
             type_conversions[var_name] = var_type
 
             search = "<{}:{}>".format(var_type, var_name)
-            # FIXME: The replacement RE should really match the type...
-            replacement = r"(?P<{}>[\w\d._-]+)".format(var_name)
+            # Get the type-appropriate replacement regex.
+            replacement_raw_re = self.get_re_for_type(var_type)
+            replacement = replacement_raw_re.format(var_name=var_name)
+            # Swap out the pattern match for the regular expression
+            # for matching.
             raw_regex = raw_regex.replace(search, replacement)
 
         regex = re.compile("^" + raw_regex + "$")
