@@ -1,0 +1,15 @@
+<html>
+    <head>
+        <title>App List</title>
+    </head>
+
+    <body>
+        <h1>App List</h1>
+
+        <ul>
+            {% for app in apps %}
+                <li><a href="/apps/{{ app.app_id }}/">{{ app.title }}</a></li>
+            {% endfor %}
+        </ul>
+    </body>
+</html>
