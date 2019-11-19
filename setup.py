@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name="itty3",
-    version="1.0.0-alpha-2",
+    version="1.0.0-beta-1",
     description=(
         "The itty-bitty Python web framework... "
         "**Now Rewritten For Python 3!**"

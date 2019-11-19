@@ -15,7 +15,7 @@ import wsgiref.util
 
 
 __author__ = "Daniel Lindsley"
-__version__ = (1, 0, 0, "alpha", 2)
+__version__ = (1, 0, 0, "beta", 1)
 __license__ = "New BSD"
 
 
