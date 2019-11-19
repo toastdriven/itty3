@@ -895,9 +895,9 @@ class App(object):
         if permanent:
             status_code = 301
 
-        resp = HttpResponse(body="", status_code=status_code)
-        resp.set_header("Location", url)
-        return resp
+        return self.render(
+            body="", headers={"Location": url}, status_code=status_code
+        )
 
     def error_404(self, request):
         """
@@ -1032,6 +1032,19 @@ class App(object):
         """
         return self._add_view(PATCH, path)
 
+    def create_request(self, environ):
+        """
+        Given a WSGI environment, creates a `HttpRequest` object.
+
+        Args:
+            environ (dict-alike): The environment data coming from the WSGI
+                server, including request information.
+
+        Returns:
+            HttpRequest: A built request object
+        """
+        return HttpRequest.from_wsgi(environ)
+
     def process_request(self, environ, start_response):
         """
         Processes a specific WSGI request.
@@ -1057,7 +1070,7 @@ class App(object):
         Returns:
             iterable: The body iterable for the WSGI server
         """
-        request = HttpRequest.from_wsgi(environ)
+        request = self.create_request(environ)
         resp = None
 
         try:
