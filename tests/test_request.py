@@ -59,7 +59,7 @@ class TestHttpRequest(unittest.TestCase):
 
     def test_from_wsgi(self):
         mock_environ = {
-            "HTTP_CONTENT-TYPE": "application/json",
+            "HTTP_CONTENT_TYPE": "application/json",
             "HTTP_ACCEPT": "application/json",
             "REQUEST_METHOD": "POST",
             "wsgi.input": io.StringIO('{"hello": "world"}'),
@@ -70,6 +70,7 @@ class TestHttpRequest(unittest.TestCase):
             "PATH_INFO": "/secure/checkout",
             "CONTENT_LENGTH": "18",
             "CONTENT_TYPE": "application/json",
+            "HTTP_X_AUTHORIZED": "heckyeah",
         }
 
         req = itty3.HttpRequest.from_wsgi(mock_environ)
@@ -82,6 +83,7 @@ class TestHttpRequest(unittest.TestCase):
         self.assertEqual(len(req.query), 0)
         self.assertEqual(req.fragment, "")
         self.assertEqual(req.content_type(), "application/json")
+        self.assertEqual(req.headers.get("X-Authorized"), "heckyeah")
 
     def test_content_type_simple(self):
         self.assertEqual(self.request.content_type(), "text/html")
@@ -101,7 +103,19 @@ class TestHttpRequest(unittest.TestCase):
         )
         self.assertEqual(req.content_type(), "application/json")
 
+    def test__ensure_unicode(self):
+        data = b"binary=AF+RN&colors=blue&colors=red"
+        self.assertEqual(
+            self.request._ensure_unicode(data),
+            {"binary": ["AF RN"], "colors": ["blue", "red"]},
+        )
+
     def test_GET(self):
+        self.assertIsNone(self.request._GET)
+        self.assertEqual(self.request.GET["name"], "Daniel")
+
+        # Now hit the cache...
+        self.assertIsNotNone(self.request._GET)
         self.assertEqual(self.request.GET["name"], "Daniel")
 
     def test_POST(self):
@@ -144,3 +158,15 @@ class TestHttpRequest(unittest.TestCase):
         )
 
         self.assertEqual(req.json(), {"hello": "world"})
+
+    def test_json_but_its_not_json(self):
+        req = itty3.HttpRequest(
+            "/greet/",
+            itty3.POST,
+            body="Hello, world!",
+            headers={"Content-Type": itty3.PLAIN,},
+        )
+
+        # Trying to call `.json()` on a non-JSON payload gives you an empty
+        # dict instead of blowing up trying to decode something.
+        self.assertEqual(req.json(), {})

@@ -241,7 +241,7 @@ class QueryDict(object):
 
         for key, values in self._data.items():
             if len(values) < 1:
-                results.append((key, ""))
+                results.append((key, None))
             else:
                 results.append((key, values[0]))
 
@@ -349,8 +349,8 @@ class HttpRequest(object):
         """
         headers = {}
         non_http_prefixed_headers = [
-            "CONTENT_TYPE",
-            "CONTENT_LENGTH",
+            "CONTENT-TYPE",
+            "CONTENT-LENGTH",
             # TODO: Maybe in the future, add support for...?
             # 'GATEWAY_INTERFACE',
             # 'REMOTE_ADDR',
@@ -364,9 +364,9 @@ class HttpRequest(object):
         for key, value in environ.items():
             mangled_key = key.replace("_", "-")
 
-            if key.startswith("HTTP-"):
+            if mangled_key.startswith("HTTP-"):
                 headers[mangled_key[5:]] = value
-            elif key in non_http_prefixed_headers:
+            elif mangled_key in non_http_prefixed_headers:
                 headers[mangled_key] = value
 
         body = ""
@@ -407,7 +407,7 @@ class HttpRequest(object):
             if isinstance(key, bytes):
                 key = key.decode("utf-8")
 
-            if isinstance(value, bytes):
+            if isinstance(value, bytes):  # pragma: no cover
                 value = value.decode("utf-8")
             elif isinstance(value, (list, tuple)):
                 new_value = []

@@ -129,6 +129,22 @@ class TestApp(unittest.TestCase):
             },
         )
 
+    def test_redirect_permanent(self):
+        req = itty3.HttpRequest("/greet/?name=Daniel", "GET")
+        resp = self.app.redirect(
+            req, "/why/hello/there/Daniel/", permanent=True
+        )
+        self.assertEqual(resp.body, "")
+        self.assertEqual(resp.status_code, 301)
+        self.assertEqual(resp.content_type, itty3.PLAIN)
+        self.assertEqual(
+            resp.headers,
+            {
+                "Content-Type": "text/plain",
+                "Location": "/why/hello/there/Daniel/",
+            },
+        )
+
     def setup_working_app(self):
         self.app.add_route("GET", "/", self.mock_index_view)
         self.app.add_route("GET", "/test/", self.mock_simple_view)
@@ -138,6 +154,22 @@ class TestApp(unittest.TestCase):
         self.app.add_route(
             "POST", "/app/<uuid:app_id>/", self.mock_complex_view
         )
+
+    def test___call__(self):
+        self.setup_working_app()
+
+        self.mock_environ["wsgi.input"] = io.StringIO()
+        mock_sr = mock.Mock()
+
+        # We've already got an instance, so this is actually hitting
+        # `App.__call__`.
+        # This is for integrating with other WSGI servers.
+        resp = self.app(self.mock_environ, mock_sr)
+        self.assertEqual(resp, [b"Hello"])
+        mock_sr.assert_called_once_with(
+            "200 OK", [("Content-Type", "text/html")]
+        )
+        self.mock_index_view.assert_called_once_with(mock.ANY)
 
     def test_process_request_index(self):
         self.setup_working_app()
@@ -244,6 +276,25 @@ class TestApp(unittest.TestCase):
         )
         self.mock_index_view.assert_called_once_with(mock.ANY)
 
+    def test_process_request_bad_404_override(self):
+        class OopsApp(itty3.App):
+            def error_404(self, request):
+                # We didn't return a response OH NOES
+                2 + 5
+
+        app = OopsApp()
+
+        self.mock_environ["wsgi.input"] = io.StringIO()
+        self.mock_environ["REQUEST_METHOD"] = "GET"
+        self.mock_environ["PATH_INFO"] = "/"
+        mock_sr = mock.Mock()
+
+        resp = app.process_request(self.mock_environ, mock_sr)
+        self.assertEqual(resp, [b"Internal Error"])
+        mock_sr.assert_called_once_with(
+            "500 Internal Server Error", [("Content-Type", "text/html")]
+        )
+
 
 class TestAppDecorators(unittest.TestCase):
     def test_decorators(self):
@@ -267,8 +318,16 @@ class TestAppDecorators(unittest.TestCase):
         def create_list(req, list_id):
             return app.render("Updated that list")
 
+        @app.patch("/lists/bulk")
+        def bulk_list(req, list_id):
+            return app.render("Changed a bunch of that list")
+
+        @app.delete("/lists/<int:list_id>")
+        def delete_list(req, list_id):
+            return app.render("Killed that list")
+
         # Now check the routes to ensure they were populated.
-        self.assertEqual(len(app._routes), 4)
+        self.assertEqual(len(app._routes), 6)
 
         self.assertEqual(app._routes[0].method, "GET")
         self.assertEqual(app._routes[0].path, "/")
@@ -281,3 +340,23 @@ class TestAppDecorators(unittest.TestCase):
 
         self.assertEqual(app._routes[3].method, "PUT")
         self.assertEqual(app._routes[3].path, "/lists/<int:list_id>")
+
+        self.assertEqual(app._routes[4].method, "PATCH")
+        self.assertEqual(app._routes[4].path, "/lists/bulk")
+
+        self.assertEqual(app._routes[5].method, "DELETE")
+        self.assertEqual(app._routes[5].path, "/lists/<int:list_id>")
+
+    def test__add_view(self):
+        # This is largely for coverage, but is one of the more important
+        # lines in itty3, so exercise it.
+        app = itty3.App()
+        mock_req = mock.Mock()
+
+        def adder(req, x, y):
+            return x + y
+
+        head_wrapper = app._add_view("HEAD", "/")
+        head_wrapped = head_wrapper(adder)
+
+        self.assertEqual(head_wrapped(mock_req, 2, 3), 5)

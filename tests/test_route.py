@@ -131,7 +131,7 @@ class TestRoute(unittest.TestCase):
             "major_version": "2",
             "release": "test",
         }
-        route.convert_types(matches)
+        matches = route.convert_types(matches)
         self.assertEqual(
             matches,
             {
@@ -140,6 +140,34 @@ class TestRoute(unittest.TestCase):
                 "major_version": 2,
                 "release": "test",
             },
+        )
+
+    def test_convert_types_float(self):
+        route = itty3.Route(
+            "GET", "/charge/<float:money>/", self.mock_complex_view
+        )
+
+        matches = {
+            "money": "22.95",
+        }
+        matches = route.convert_types(matches)
+        self.assertEqual(
+            matches, {"money": 22.95},
+        )
+
+    def test_convert_types_extra_matches(self):
+        route = itty3.Route(
+            "GET", "/charge/<float:money>/", self.mock_complex_view
+        )
+
+        matches = {
+            "money": "22.95",
+            # This shouldn't really happen in practice, but...
+            "hello": "world",
+        }
+        matches = route.convert_types(matches)
+        self.assertEqual(
+            matches, {"money": 22.95, "hello": "world"},
         )
 
     def test_extract_kwargs(self):
@@ -166,3 +194,14 @@ class TestRoute(unittest.TestCase):
                 "release": "test",
             },
         )
+
+    def test_extract_kwargs_no_variables(self):
+        uri = "/app/"
+        route = itty3.Route(
+            "GET", "/app/<uuid:app_id>/", self.mock_complex_view
+        )
+
+        # Sanity check.
+        self.assertEqual(route._type_conversions, {"app_id": "uuid"})
+
+        self.assertEqual(route.extract_kwargs(uri), {})

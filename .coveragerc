@@ -1,0 +1,9 @@
+[report]
+# Regexes for lines to exclude from consideration
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    def __str__
+    if __name__ == .__main__.:
+    def run
+    if self.debug
