@@ -896,7 +896,11 @@ class App(object):
             status_code = 301
 
         return self.render(
-            body="", headers={"Location": url}, status_code=status_code
+            request,
+            body="",
+            headers={"Location": url},
+            status_code=status_code,
+            content_type=PLAIN,
         )
 
     def error_404(self, request):
