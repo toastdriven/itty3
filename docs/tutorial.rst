@@ -418,8 +418,11 @@ With this, you've built your first working application with ``itty3``.
 For more information, you can:
 
 * Refer to the API docs at :doc:`reference/itty3`
+* Read some `example code`_
 * Check out the :ref:`deploying` guide
 * Find out how to :ref:`extending`
 * Learn how to :ref:`troubleshooting`
 
 Happy developing!
+
+.. _`example code`: https://github.com/toastdriven/itty3/tree/master/examples
