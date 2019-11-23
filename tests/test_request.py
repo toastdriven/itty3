@@ -71,6 +71,7 @@ class TestHttpRequest(unittest.TestCase):
             "CONTENT_LENGTH": "18",
             "CONTENT_TYPE": "application/json",
             "HTTP_X_AUTHORIZED": "heckyeah",
+            "SERVER_PROTOCOL": "HTTP/1.1",
         }
 
         req = itty3.HttpRequest.from_wsgi(mock_environ)
@@ -84,6 +85,8 @@ class TestHttpRequest(unittest.TestCase):
         self.assertEqual(req.fragment, "")
         self.assertEqual(req.content_type(), "application/json")
         self.assertEqual(req.headers.get("X-Authorized"), "heckyeah")
+        self.assertEqual(req.content_length, 18)
+        self.assertEqual(req.request_protocol, "HTTP/1.1")
 
     def test_content_type_simple(self):
         self.assertEqual(self.request.content_type(), "text/html")
@@ -164,7 +167,7 @@ class TestHttpRequest(unittest.TestCase):
             "/greet/",
             itty3.POST,
             body="Hello, world!",
-            headers={"Content-Type": itty3.PLAIN,},
+            headers={"Content-Type": itty3.PLAIN},
         )
 
         # Trying to call `.json()` on a non-JSON payload gives you an empty
