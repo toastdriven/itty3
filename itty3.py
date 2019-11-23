@@ -156,6 +156,12 @@ class QueryDict(object):
         if self._data is None:
             self._data = {}
 
+    def __str__(self):
+        return "<QueryDict: {} keys>".format(len(self._data))
+
+    def __repr__(self):
+        return str(self)
+
     def __iter__(self):
         return iter(self._data)
 
@@ -303,6 +309,17 @@ class HttpRequest(object):
 
         if len(domain_bits) > 1 and domain_bits[1]:
             self.port = int(domain_bits[1])
+
+    def __str__(self):
+        return "<HttpRequest: {} {}>".format(self.method, self.raw_uri)
+
+    def __repr__(self):
+        return str(self)
+
+    def get_status_line(self):
+        return "{} {} {}".format(
+            self.method, self.path, self.request_protocol
+        )
 
     def split_uri(self, full_uri):
         """
@@ -519,6 +536,12 @@ class HttpResponse(object):
         self.start_response = None
 
         self.set_header("Content-Type", self.content_type)
+
+    def __str__(self):
+        return "<HttpResponse: {}>".format(self.status_code)
+
+    def __repr__(self):
+        return str(self)
 
     def set_header(self, name, value):
         """
