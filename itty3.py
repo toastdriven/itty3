@@ -8,6 +8,7 @@ The itty-bitty Python web framework... **Now Rewritten For Python 3!**
 import functools
 import io
 import json
+import logging
 import re
 import urllib.parse
 import wsgiref.headers
@@ -37,6 +38,15 @@ def get_version(full=False):
         return "{}-{}".format(short, long)
 
     return short
+
+
+# Default logging config for itty3.
+# We attach a NullHandler by default, so that we don't produce logs.
+# The user can choose to add new handlers to capture logs, at the
+# level/location they wish.
+log = logging.getLogger(__name__)
+null_handler = logging.NullHandler()
+log.addHandler(null_handler)
 
 
 # Constants
@@ -156,6 +166,12 @@ class QueryDict(object):
         if self._data is None:
             self._data = {}
 
+    def __str__(self):
+        return "<QueryDict: {} keys>".format(len(self._data))
+
+    def __repr__(self):
+        return str(self)
+
     def __iter__(self):
         return iter(self._data)
 
@@ -260,6 +276,8 @@ class HttpRequest(object):
         scheme (str, Optional): The HTTP scheme ("http|https")
         host (str, Optional): The hostname of the request
         port (int, Optional): The port of the request
+        content_length (int, Optional): The length of the body of the request
+        request_protocol (str, Optional): The protocol of the request
     """
 
     def __init__(
@@ -271,6 +289,8 @@ class HttpRequest(object):
         scheme="http",
         host="",
         port=80,
+        content_length=0,
+        request_protocol="HTTP/1.0",
     ):
         self.raw_uri = uri
         self.method = method.upper()
@@ -278,6 +298,8 @@ class HttpRequest(object):
         self.scheme = scheme
         self.host = host
         self.port = int(port)
+        self.content_length = int(content_length)
+        self.request_protocol = request_protocol
 
         # For caching.
         self._GET, self._POST, self._PUT = None, None, None
@@ -303,6 +325,17 @@ class HttpRequest(object):
 
         if len(domain_bits) > 1 and domain_bits[1]:
             self.port = int(domain_bits[1])
+
+    def __str__(self):
+        return "<HttpRequest: {} {}>".format(self.method, self.raw_uri)
+
+    def __repr__(self):
+        return str(self)
+
+    def get_status_line(self):
+        return "{} {} {}".format(
+            self.method, self.path, self.request_protocol
+        )
 
     def split_uri(self, full_uri):
         """
@@ -358,7 +391,6 @@ class HttpRequest(object):
             # 'SCRIPT_NAME',
             # 'SERVER_NAME',
             # 'SERVER_PORT',
-            # 'SERVER_PROTOCOL'
         ]
 
         for key, value in environ.items():
@@ -378,6 +410,8 @@ class HttpRequest(object):
             # like gunicorn do not. Give it our best effort.
             if not getattr(wsgi_input, "closed", False):
                 body = wsgi_input.read(int(content_length))
+        else:
+            content_length = 0
 
         return cls(
             uri=wsgiref.util.request_uri(environ),
@@ -386,6 +420,8 @@ class HttpRequest(object):
             body=body,
             scheme=wsgiref.util.guess_scheme(environ),
             port=environ.get("SERVER_PORT", "80"),
+            content_length=content_length,
+            request_protocol=environ.get("SERVER_PROTOCOL", "HTTP/1.0"),
         )
 
     def content_type(self):
@@ -519,6 +555,12 @@ class HttpResponse(object):
         self.start_response = None
 
         self.set_header("Content-Type", self.content_type)
+
+    def __str__(self):
+        return "<HttpResponse: {}>".format(self.status_code)
+
+    def __repr__(self):
+        return str(self)
 
     def set_header(self, name, value):
         """
@@ -765,6 +807,19 @@ class App(object):
     def __init__(self, debug=False):
         self._routes = []
         self.debug = debug
+        self.log = self.get_log()
+
+    def get_log(self):
+        """
+        Returns a `logging.Logger` instance.
+
+        By default, we return the `itty3` module-level logger. Users are
+        free to override this to meet their needs.
+
+        Returns:
+            logging.Logger: The module-level logger
+        """
+        return log
 
     def __call__(self, environ, start_response):
         # Allows providing the `App` instance as the WSGI handler to
@@ -782,6 +837,7 @@ class App(object):
         """
         route = Route(method, path, func)
         self._routes.append(route)
+        self.log.debug("Added {} - {}".format(route, func.__name__))
 
     def find_route(self, method, path):
         """
@@ -814,7 +870,8 @@ class App(object):
         """
         try:
             offset = self.find_route(method, path)
-            self._routes.pop(offset)
+            old_route = self._routes.pop(offset)
+            self.log.debug("Removed {}".format(old_route))
         except RouteNotFound:
             pass
 
@@ -1047,6 +1104,7 @@ class App(object):
         Returns:
             HttpRequest: A built request object
         """
+        self.log.debug("Received environ {}".format(environ))
         return HttpRequest.from_wsgi(environ)
 
     def process_request(self, environ, start_response):
@@ -1075,6 +1133,11 @@ class App(object):
             iterable: The body iterable for the WSGI server
         """
         request = self.create_request(environ)
+        self.log.debug(
+            "Started processing request for {} {}...".format(
+                request.method, request.path
+            )
+        )
         resp = None
 
         try:
@@ -1085,10 +1148,26 @@ class App(object):
                 # We have a route that can handle the method & path!
                 # Call the view function!
                 try:
+                    self.log.debug(
+                        "Route {} will handle {} {}...".format(
+                            route, request.method, request.raw_uri
+                        )
+                    )
                     kwargs = route.extract_kwargs(request.path)
+                    self.log.debug(
+                        "Calling {} with arguments {}".format(
+                            route.func.__name__, kwargs
+                        )
+                    )
                     resp = route.func(request, **kwargs)
                     break
                 except Exception:
+                    self.log.exception(
+                        "View {} raised an exception!".format(
+                            route.func.__name__
+                        )
+                    )
+
                     if self.debug:
                         raise
 
@@ -1098,13 +1177,52 @@ class App(object):
             if not resp:
                 raise RouteNotFound("No view found to handle method/path")
         except RouteNotFound:
+            self.log.debug("No route matched. Returning a 404...")
             resp = self.error_404(request)
 
         if not resp:
+            self.log.debug("No response returned by view. Returning a 500...")
             resp = self.error_500(request)
 
+        self.log.info(
+            '"{}" {}'.format(request.get_status_line(), resp.status_code)
+        )
         resp.start_response = start_response
         return resp.write()
+
+    def reset_logging(self, level=logging.INFO):
+        """
+        A method for controlling how `App.run` does logging.
+
+        Disables `wsgiref`'s default "logging" to `stderr` & replaces it
+        with `itty3`-specific logging.
+
+        Args:
+            level (int, Optional): The `logging.LEVEL` you'd like to have
+                output. Default is `logging.INFO`.
+
+        Returns:
+            wsgiref.WSGIRequestHandler: The handler class to be used.
+                Defaults to a custom `NoStdErrHandler` class.
+        """
+        from wsgiref.simple_server import WSGIRequestHandler
+
+        # Disable the vanilla wsgiref logging & enable itty3's logging.
+        # We don't do this by default at the top of the module, because it
+        # should be the user's choice how logging happens.
+        class NoStdErrHandler(WSGIRequestHandler):
+            def log_message(self, *args, **kwargs):
+                pass
+
+        self.log.removeHandler(null_handler)
+        default_format = logging.Formatter(
+            "%(asctime)s %(name)s %(levelname)s %(message)s"
+        )
+        stdout_handler = logging.StreamHandler()
+        stdout_handler.setFormatter(default_format)
+        self.log.addHandler(stdout_handler)
+        self.log.setLevel(level)
+        return NoStdErrHandler
 
     def run(self, addr="127.0.0.1", port=8000, debug=None):
         """
@@ -1125,16 +1243,17 @@ class App(object):
         import sys
         from wsgiref.simple_server import make_server
 
+        handler = self.reset_logging()
+
         if self.debug is not None:
             self.debug = bool(debug)
 
-        httpd = make_server(addr, port, self.process_request)
-
-        print(
-            "itty3 {}: Now serving requests at http://{}:{}...".format(
-                get_version(full=True), addr, port
-            )
+        httpd = make_server(
+            addr, port, self.process_request, handler_class=handler
         )
+
+        server_msg = "itty3 {}: Now serving requests at http://{}:{}..."
+        self.log.info(server_msg.format(get_version(full=True), addr, port))
 
         try:
             httpd.serve_forever()

@@ -22,12 +22,15 @@ class TestApp(unittest.TestCase):
             return self.app.render(req, "Saw {}".format(app_id))
 
         self.mock_index_view = mock.Mock()
+        self.mock_index_view.__name__ = mock_index.__name__
         self.mock_index_view.side_effect = mock_index
 
         self.mock_simple_view = mock.Mock()
+        self.mock_simple_view.__name__ = mock_simple.__name__
         self.mock_simple_view.side_effect = mock_simple
 
         self.mock_complex_view = mock.Mock()
+        self.mock_complex_view.__name__ = mock_complex.__name__
         self.mock_complex_view.side_effect = mock_complex
 
         self.mock_environ = {
