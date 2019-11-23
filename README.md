@@ -25,11 +25,11 @@ if __name__ == "__main__":
 
 ## Why?
 
-`itty3` is a micro-framework for serving web traffic. Prior to its inital
-release, `itty3` weighed in at just 500 lines of code.
+`itty3` is a micro-framework for serving web traffic. At its `1.0.0`
+release, `itty3` weighed in at less than ~1k lines of code.
 
 Granted, it builds on the shoulders of giants, using big chunks of the Python
-standard library. But it has no other external dependencies!
+standard library. But it has **no** other external dependencies!
 
 Reasons for `itty3`:
 
