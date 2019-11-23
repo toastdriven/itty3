@@ -40,7 +40,7 @@ def get_version(full=False):
 
     if full:
         long = "-".join([str(v) for v in __version__[3:]])
-        return "{}-{}".format(short, long)
+        return "{}-{}".format(short, long) if long else short
 
     return short
 
