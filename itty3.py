@@ -9,6 +9,8 @@ import functools
 import io
 import json
 import logging
+import mimetypes
+import os
 import re
 import urllib.parse
 import wsgiref.headers
@@ -678,6 +680,9 @@ class Route(object):
     def get_re_for_slug(self):
         return r"[\w\d._-]+"
 
+    def get_re_for_any(self):
+        return r".+"
+
     def get_re_for_type(self, desired_type):
         """
         Fetches the correct regex for a given type.
@@ -812,6 +817,8 @@ class App(object):
     def __init__(self, debug=False):
         self._routes = []
         self.debug = debug
+        self.static_root = None
+        self.static_url_path = None
         self.log = self.get_log()
 
     def get_log(self):
@@ -963,6 +970,63 @@ class App(object):
             headers={"Location": url},
             status_code=status_code,
             content_type=PLAIN,
+        )
+
+    def render_static(self, request, asset_path):
+        """
+        Handles serving static assets.
+
+        WARNING: This should really only be used in development!
+
+        It's slow (compared to nginx, Apache or whatever), it hasn't gone
+        through any security assessments (which means potential security
+        holes), it's imperfect w/ regard to mimetypes.
+
+        Args:
+            request (HttpRequest): The request being handled
+            asset_path (str): A path of the asset to be served
+
+        Returns:
+            HttpResponse: The populated response object
+        """
+        if not self.static_root:
+            return self.error_404(request)
+
+        # First, we remove any relative nonsense from the path.
+        cleaned_path = os.path.normpath(asset_path)
+        cleaned_static_root = os.path.abspath(self.static_root)
+        # Then force it under the static root, so that escaping outside
+        # the static root shouldn't be do-able.
+        path = os.path.join(cleaned_static_root, cleaned_path)
+
+        # If it doesn't exist, immediately return a 404.
+        if not os.path.exists(path):
+            return self.error_404(request)
+
+        # Attempt to work out the content-type.
+        content_type = PLAIN
+        mtype, menc = mimetypes.guess_type(asset_path)
+
+        if mtype is not None:
+            content_type = mtype
+
+        # Actually read the file & decode it to bytes.
+        with open(path, "rb") as raw_file:
+            content = raw_file.read()
+            content_length = len(content)
+
+            if content_type.startswith(
+                "application"
+            ) or content_type.startswith("text"):
+                content = content.decode("utf-8")
+
+        # Approximate the content-length.
+        headers = {
+            "Content-Length": content_length,
+        }
+
+        return self.render(
+            request, content, content_type=content_type, headers=headers
         )
 
     def error_404(self, request):
@@ -1229,7 +1293,14 @@ class App(object):
         self.log.setLevel(level)
         return NoStdErrHandler
 
-    def run(self, addr="127.0.0.1", port=8000, debug=None):
+    def run(
+        self,
+        addr="127.0.0.1",
+        port=8000,
+        debug=None,
+        static_url_path=None,
+        static_root=None,
+    ):
         """
         An included development/debugging server for running the `App`
         itself.
@@ -1244,6 +1315,12 @@ class App(object):
             debug (bool, Optional): Whether the server should be run in a
                 debugging mode. If provided, this overrides the `App.debug`
                 set during initialization.
+            static_url_path (str, Optional): The desired URL prefix for
+                static assets. e.g. `/static/`. Defaults to `None` (no static
+                serving).
+            static_root (str, Optional): The filesystem path to the static
+                assets. e.g. `../static_assets`. Can be either a relative or
+                absolute path. Defaults to `None` (no static serving).
         """
         import sys
         from wsgiref.simple_server import make_server
@@ -1252,6 +1329,14 @@ class App(object):
 
         if self.debug is not None:
             self.debug = bool(debug)
+
+        if static_root and static_url_path:
+            self.static_root = static_root
+            self.static_url_path = static_url_path
+            url = urllib.parse.urljoin(
+                self.static_url_path, "<any:asset_path>"
+            )
+            self.add_route(GET, url, self.render_static)
 
         httpd = make_server(
             addr, port, self.process_request, handler_class=handler
