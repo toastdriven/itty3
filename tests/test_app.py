@@ -1,4 +1,5 @@
 import io
+import os
 import unittest
 from unittest import mock
 
@@ -47,6 +48,8 @@ class TestApp(unittest.TestCase):
     def test_attributes(self):
         self.assertEqual(self.app._routes, [])
         self.assertEqual(self.app.debug, False)
+        self.assertEqual(self.app.static_root, None)
+        self.assertEqual(self.app.static_url_path, None)
 
     def test_add_route(self):
         self.assertEqual(len(self.app._routes), 0)
@@ -101,6 +104,70 @@ class TestApp(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.content_type, itty3.JSON)
         self.assertEqual(resp.headers, {"Content-Type": "application/json"})
+
+    def test_render_static_not_configured(self):
+        req = itty3.HttpRequest("/static/css/default.css", "GET")
+        resp = self.app.render_static(req, "css/default.css")
+        self.assertEqual(resp.status_code, 404)
+
+    def test_render_static_not_found(self):
+        # We have to manually setup the static serving here (normally
+        # handled in `App.run`).
+        self.app.static_root = os.path.join(
+            os.path.dirname(__file__), "test_static_assets",
+        )
+        self.app.static_url_path = "/static/"
+        self.app.add_route(
+            itty3.GET, "/static/<any:asset_path>", self.app.render_static
+        )
+
+        req = itty3.HttpRequest(
+            "/static/not/even/../present//whatev.wmv", "GET"
+        )
+        resp = self.app.render_static(
+            req, "/static/not/even/../present//whatev.wmv"
+        )
+        self.assertEqual(resp.status_code, 404)
+
+    def test_render_static_css(self):
+        # We have to manually setup the static serving here (normally
+        # handled in `App.run`).
+        self.app.static_root = os.path.join(
+            os.path.dirname(__file__), "test_static_assets",
+        )
+        self.app.static_url_path = "/static/"
+        self.app.add_route(
+            itty3.GET, "/static/<any:asset_path>", self.app.render_static
+        )
+
+        req = itty3.HttpRequest("/static/css/default.css", "GET")
+        resp = self.app.render_static(req, "css/default.css")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.content_type, "text/css")
+        self.assertEqual(
+            resp.headers, {"Content-Type": "text/css", "Content-Length": 146},
+        )
+        self.assertTrue(resp.body.startswith("/* Reset"))
+
+    def test_render_static_png(self):
+        # We have to manually setup the static serving here (normally
+        # handled in `App.run`).
+        self.app.static_root = os.path.join(
+            os.path.dirname(__file__), "test_static_assets",
+        )
+        self.app.static_url_path = "/static/"
+        self.app.add_route(
+            itty3.GET, "/static/<any:asset_path>", self.app.render_static
+        )
+
+        req = itty3.HttpRequest("/static/itty.png", "GET")
+        resp = self.app.render_static(req, "itty.png")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.content_type, "image/png")
+        self.assertEqual(
+            resp.headers,
+            {"Content-Type": "image/png", "Content-Length": 1473},
+        )
 
     def test_error_404(self):
         req = itty3.HttpRequest("/greet/?name=Daniel", "GET")
