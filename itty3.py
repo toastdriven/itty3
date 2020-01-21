@@ -6,12 +6,14 @@ itty3
 The itty-bitty Python web framework... **Now Rewritten For Python 3!**
 """
 import functools
+import http.cookies
 import io
 import json
 import logging
 import mimetypes
 import os
 import re
+import sys
 import urllib.parse
 import wsgiref.headers
 import wsgiref.util
@@ -55,6 +57,7 @@ log = logging.getLogger(__name__)
 null_handler = logging.NullHandler()
 log.addHandler(null_handler)
 
+PY_VERSION = sys.version_info
 
 # Constants
 GET = "GET"
@@ -71,6 +74,11 @@ HTML = "text/html"
 JSON = "application/json"
 FORM = "application/x-www-form-urlencoded"
 AJAX = "X-Requested-With"
+
+COOKIE_HEADER = "HTTP-COOKIE"
+SAME_SITE_NONE = "None"
+SAME_SITE_LAX = "Lax"
+SAME_SITE_STRICT = "Strict"
 
 UUID_PATTERN = (
     r"[A-Fa-f0-9]{{8}}-"
@@ -285,6 +293,8 @@ class HttpRequest(object):
         port (int, Optional): The port of the request
         content_length (int, Optional): The length of the body of the request
         request_protocol (str, Optional): The protocol of the request
+        cookies (http.cookies.SimpleCookie, Optional): The cookies sent as
+            part of the request.
     """
 
     def __init__(
@@ -298,6 +308,7 @@ class HttpRequest(object):
         port=80,
         content_length=0,
         request_protocol="HTTP/1.0",
+        cookies=None,
     ):
         self.raw_uri = uri
         self.method = method.upper()
@@ -307,6 +318,8 @@ class HttpRequest(object):
         self.port = int(port)
         self.content_length = int(content_length)
         self.request_protocol = request_protocol
+        self._cookies = cookies or http.cookies.SimpleCookie()
+        self.COOKIES = {}
 
         # For caching.
         self._GET, self._POST, self._PUT = None, None, None
@@ -319,6 +332,9 @@ class HttpRequest(object):
         self.headers = wsgiref.headers.Headers(
             [(k, v) for k, v in headers.items()]
         )
+
+        for key, morsel in self._cookies.items():
+            self.COOKIES[key] = morsel.value
 
         uri_bits = self.split_uri(self.raw_uri)
         domain_bits = uri_bits.get("netloc", ":").split(":", 1)
@@ -388,6 +404,7 @@ class HttpRequest(object):
                 present.
         """
         headers = {}
+        cookies = {}
         non_http_prefixed_headers = [
             "CONTENT-TYPE",
             "CONTENT-LENGTH",
@@ -403,7 +420,10 @@ class HttpRequest(object):
         for key, value in environ.items():
             mangled_key = key.replace("_", "-")
 
-            if mangled_key.startswith("HTTP-"):
+            if mangled_key == COOKIE_HEADER:
+                cookies = http.cookies.SimpleCookie()
+                cookies.load(value)
+            elif mangled_key.startswith("HTTP-"):
                 headers[mangled_key[5:]] = value
             elif mangled_key in non_http_prefixed_headers:
                 headers[mangled_key] = value
@@ -429,6 +449,7 @@ class HttpRequest(object):
             port=environ.get("SERVER_PORT", "80"),
             content_length=content_length,
             request_protocol=environ.get("SERVER_PROTOCOL", "HTTP/1.0"),
+            cookies=cookies,
         )
 
     def content_type(self):
@@ -559,6 +580,7 @@ class HttpResponse(object):
         self.status_code = int(status_code)
         self.headers = headers or {}
         self.content_type = content_type
+        self._cookies = http.cookies.SimpleCookie()
         self.start_response = None
 
         self.set_header("Content-Type", self.content_type)
@@ -584,6 +606,99 @@ class HttpResponse(object):
 
         if name.lower() == "content-type":
             self.content_type = value
+
+    def set_cookie(
+        self,
+        key,
+        value="",
+        max_age=None,
+        expires=None,
+        path="/",
+        domain=None,
+        secure=False,
+        httponly=False,
+        samesite=None,
+    ):
+        """
+        Sets a cookie on the response.
+
+        Takes the same parameters as the `http.cookies.Morsel` object from
+        the Python stdlib.
+
+        Args:
+            key (str): The name of the cookie.
+            value (Any): The value of the cookie.
+            max_age (int, Optional): How many seconds the cookie lives for.
+                Default is `None`
+                (expires at the end of the browser session).
+            expires (str or datetime, Optional): A specific date/time (in
+                UTC) when the cookie should expire. Default is `None`
+                (expires at the end of the browser session).
+            path (str, Optional): The path the cookie is valid for.
+                Default is `"/"`.
+            domain (str, Optional): The domain the cookie is valid for.
+                Default is `None` (only the domain that set it).
+            secure (bool, Optional): If the cookie should only be served by
+                HTTPS. Default is `False`.
+            httponly (bool, Optional): If `True`, prevents the cookie from
+                being provided to Javascript requests. Default is `False`.
+            samesite (str, Optional): How the cookie should behave under
+                cross-site requests. Options are `itty3.SAME_SITE_NONE`,
+                `itty3.SAME_SITE_LAX`, and `itty3.SAME_SITE_STRICT`.
+                Default is `None`.
+                Only for Python 3.8+.
+        """
+        morsel = http.cookies.Morsel()
+        # TODO: In the future, signed cookies might be nice here.
+        morsel.set(key, value, value)
+
+        # Allow setting expiry w/ a `datetime`.
+        if hasattr(expires, "strftime"):
+            expires = expires.strftime("%a, %-d %b %Y %H:%M:%S GMT")
+
+        # Ensure the max-age is an `int`.
+        if max_age is not None:
+            max_age = int(max_age)
+
+        morsel.update(
+            {
+                "max-age": max_age,
+                "expires": expires,
+                "path": path,
+                "domain": domain,
+                "secure": secure,
+                "httponly": httponly,
+            }
+        )
+
+        if PY_VERSION[1] >= 8:
+            # `samesite` is only supported in Python 3.8+.
+            morsel.update({"samesite": samesite})
+
+        self._cookies[key] = morsel
+
+    def delete_cookie(self, key, path="/", domain=None):
+        """
+        Removes a cookie.
+
+        Succeed regards if the cookie is already set or not.
+
+        Args:
+            key (str): The name of the cookie.
+            path (str, Optional): The path the cookie is valid for.
+                Default is `"/"`.
+            domain (str, Optional): The domain the cookie is valid for.
+                Default is `None` (only the domain that set it).
+        """
+        self.set_cookie(
+            key,
+            value="",
+            # We set a Max-Age of `0` to expire the cookie immediately,
+            # thus "deleting" it.
+            max_age=0,
+            path=path,
+            domain=domain,
+        )
 
     def write(self):
         """
@@ -611,7 +726,15 @@ class HttpResponse(object):
             self.status_code,
             RESPONSE_CODES.get(self.status_code, RESPONSE_CODES[500]),
         )
-        self.start_response(status, [(k, v) for k, v in self.headers.items()])
+        headers = [(k, v) for k, v in self.headers.items()]
+        possible_cookies = self._cookies.output()
+
+        # Update the headers to include the cookies.
+        if possible_cookies:
+            for line in possible_cookies.splitlines():
+                headers.append(line.split(": ", 1))
+
+        self.start_response(status, headers)
         return [self.body.encode("utf-8")]
 
 
