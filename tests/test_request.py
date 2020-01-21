@@ -72,6 +72,7 @@ class TestHttpRequest(unittest.TestCase):
             "CONTENT_TYPE": "application/json",
             "HTTP_X_AUTHORIZED": "heckyeah",
             "SERVER_PROTOCOL": "HTTP/1.1",
+            "HTTP-COOKIE": "session=abc123; moof=dogcow",
         }
 
         req = itty3.HttpRequest.from_wsgi(mock_environ)
@@ -87,6 +88,8 @@ class TestHttpRequest(unittest.TestCase):
         self.assertEqual(req.headers.get("X-Authorized"), "heckyeah")
         self.assertEqual(req.content_length, 18)
         self.assertEqual(req.request_protocol, "HTTP/1.1")
+        self.assertEqual(req.COOKIES["session"], "abc123")
+        self.assertEqual(req.COOKIES["moof"], "dogcow")
 
     def test_content_type_simple(self):
         self.assertEqual(self.request.content_type(), "text/html")
