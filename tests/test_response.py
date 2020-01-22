@@ -65,10 +65,7 @@ class TestHttpResponse(unittest.TestCase):
         self.response.delete_cookie("session")
         self.assertEqual(
             self.response._cookies.output(),
-            (
-                "Set-Cookie: session=; Domain=None; expires=None; "
-                "Max-Age=0; Path=/"
-            ),
+            ("Set-Cookie: session=; Max-Age=0; Path=/"),
         )
 
     def test_write_no_start_response(self):
@@ -107,27 +104,20 @@ class TestHttpResponse(unittest.TestCase):
             "200 OK",
             [
                 ("Content-Type", "text/plain"),
-                [
+                (
                     "Set-Cookie",
                     (
-                        "moof=dogcow; Domain=*; expires=None; Max-Age=120; "
+                        "moof=dogcow; Domain=*; Max-Age=120; "
                         "Path=/history/macOS/"
                     ),
-                ],
-                [
+                ),
+                ("Set-Cookie", "session=abc123; Path=/"),
+                (
                     "Set-Cookie",
                     (
-                        "session=abc123; Domain=None; expires=None; "
-                        "Max-Age=None; Path=/"
+                        "username=johndoe; "
+                        "expires=Tue, 21 Jan 2020 20:26:08 GMT; Path=/"
                     ),
-                ],
-                [
-                    "Set-Cookie",
-                    (
-                        "username=johndoe; Domain=None; "
-                        "expires=Tue, 21 Jan 2020 20:26:08 GMT; "
-                        "Max-Age=None; Path=/"
-                    ),
-                ],
+                ),
             ],
         )

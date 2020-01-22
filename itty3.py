@@ -656,24 +656,22 @@ class HttpResponse(object):
         if hasattr(expires, "strftime"):
             expires = expires.strftime("%a, %-d %b %Y %H:%M:%S GMT")
 
+        # Always update the meaningful params.
+        morsel.update({"path": path, "secure": secure, "httponly": httponly})
+
         # Ensure the max-age is an `int`.
         if max_age is not None:
-            max_age = int(max_age)
+            morsel["max-age"] = int(max_age)
 
-        morsel.update(
-            {
-                "max-age": max_age,
-                "expires": expires,
-                "path": path,
-                "domain": domain,
-                "secure": secure,
-                "httponly": httponly,
-            }
-        )
+        if expires is not None:
+            morsel["expires"] = expires
 
-        if PY_VERSION[1] >= 8:
+        if domain is not None:
+            morsel["domain"] = domain
+
+        if PY_VERSION[1] >= 8 and samesite is not None:
             # `samesite` is only supported in Python 3.8+.
-            morsel.update({"samesite": samesite})
+            morsel["samesite"] = samesite
 
         self._cookies[key] = morsel
 
@@ -732,7 +730,7 @@ class HttpResponse(object):
         # Update the headers to include the cookies.
         if possible_cookies:
             for line in possible_cookies.splitlines():
-                headers.append(line.split(": ", 1))
+                headers.append(tuple(line.split(": ", 1)))
 
         self.start_response(status, headers)
         return [self.body.encode("utf-8")]
