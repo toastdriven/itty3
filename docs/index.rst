@@ -12,6 +12,8 @@ Welcome to itty3's documentation!
 
    tutorial
    extending
+   static_files
+   cookies
    deploying
    troubleshooting
 
