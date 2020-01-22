@@ -10,6 +10,7 @@ class TestRoute(unittest.TestCase):
         self.mock_index_view = mock.Mock()
         self.mock_simple_view = mock.Mock()
         self.mock_complex_view = mock.Mock()
+        self.mock_static_view = mock.Mock()
 
         self.route_1 = itty3.Route("GET", "/", self.mock_index_view)
         self.route_2 = itty3.Route("GET", "/greet/", self.mock_simple_view)
@@ -18,6 +19,9 @@ class TestRoute(unittest.TestCase):
         )
         self.route_4 = itty3.Route(
             "POST", "/greet/<str:name>/<int:variant>/", self.mock_complex_view
+        )
+        self.route_5 = itty3.Route(
+            "GET", "/static/<any:asset_path>", self.mock_static_view
         )
 
         self.complex_uri = (
@@ -86,6 +90,9 @@ class TestRoute(unittest.TestCase):
             self.route_1.get_re_for_type("slug"),
             r"(?P<{var_name}>[\w\d._-]+)",
         )
+        self.assertEqual(
+            self.route_1.get_re_for_type("any"), r"(?P<{var_name}>.+)",
+        )
 
     def test_create_re(self):
         regex, tc = self.route_1.create_re(self.complex_uri)
@@ -101,11 +108,22 @@ class TestRoute(unittest.TestCase):
             },
         )
 
+    def test_create_re_any(self):
+        regex, tc = self.route_1.create_re("/static/<any:asset_path>")
+        raw_re = "^/static/(?P<asset_path>.+)$"
+        self.assertEqual(regex, re.compile(raw_re))
+        self.assertEqual(
+            tc, {"asset_path": "any"},
+        )
+
     def test_can_handle(self):
         self.assertTrue(self.route_1.can_handle("GET", "/"))
         self.assertTrue(self.route_2.can_handle("GET", "/greet/"))
         self.assertTrue(self.route_3.can_handle("GET", "/greet/Daniel/3/"))
         self.assertTrue(self.route_4.can_handle("POST", "/greet/Daniel/3/"))
+        self.assertTrue(
+            self.route_5.can_handle("GET", "/static/css/default.css")
+        )
 
     def test_cant_handle(self):
         self.assertFalse(self.route_1.can_handle("POST", "/"))
@@ -205,3 +223,10 @@ class TestRoute(unittest.TestCase):
         self.assertEqual(route._type_conversions, {"app_id": "uuid"})
 
         self.assertEqual(route.extract_kwargs(uri), {})
+
+    def test_extract_kwargs_any(self):
+        uri = "/static/css/default.css"
+        self.assertEqual(
+            self.route_5.extract_kwargs(uri),
+            {"asset_path": "css/default.css"},
+        )

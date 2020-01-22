@@ -6,10 +6,14 @@ itty3
 The itty-bitty Python web framework... **Now Rewritten For Python 3!**
 """
 import functools
+import http.cookies
 import io
 import json
 import logging
+import mimetypes
+import os
 import re
+import sys
 import urllib.parse
 import wsgiref.headers
 import wsgiref.util
@@ -18,7 +22,7 @@ import wsgiref.util
 __author__ = "Daniel Lindsley"
 __version__ = (
     1,
-    0,
+    1,
     0,
 )
 __license__ = "New BSD"
@@ -39,7 +43,7 @@ def get_version(full=False):
 
     if full:
         long = "-".join([str(v) for v in __version__[3:]])
-        return "{}-{}".format(short, long)
+        return "{}-{}".format(short, long) if long else short
 
     return short
 
@@ -52,6 +56,7 @@ log = logging.getLogger(__name__)
 null_handler = logging.NullHandler()
 log.addHandler(null_handler)
 
+PY_VERSION = sys.version_info
 
 # Constants
 GET = "GET"
@@ -68,6 +73,11 @@ HTML = "text/html"
 JSON = "application/json"
 FORM = "application/x-www-form-urlencoded"
 AJAX = "X-Requested-With"
+
+COOKIE_HEADER = "HTTP-COOKIE"
+SAME_SITE_NONE = "None"
+SAME_SITE_LAX = "Lax"
+SAME_SITE_STRICT = "Strict"
 
 UUID_PATTERN = (
     r"[A-Fa-f0-9]{{8}}-"
@@ -282,6 +292,8 @@ class HttpRequest(object):
         port (int, Optional): The port of the request
         content_length (int, Optional): The length of the body of the request
         request_protocol (str, Optional): The protocol of the request
+        cookies (http.cookies.SimpleCookie, Optional): The cookies sent as
+            part of the request.
     """
 
     def __init__(
@@ -295,6 +307,7 @@ class HttpRequest(object):
         port=80,
         content_length=0,
         request_protocol="HTTP/1.0",
+        cookies=None,
     ):
         self.raw_uri = uri
         self.method = method.upper()
@@ -304,6 +317,8 @@ class HttpRequest(object):
         self.port = int(port)
         self.content_length = int(content_length)
         self.request_protocol = request_protocol
+        self._cookies = cookies or http.cookies.SimpleCookie()
+        self.COOKIES = {}
 
         # For caching.
         self._GET, self._POST, self._PUT = None, None, None
@@ -316,6 +331,9 @@ class HttpRequest(object):
         self.headers = wsgiref.headers.Headers(
             [(k, v) for k, v in headers.items()]
         )
+
+        for key, morsel in self._cookies.items():
+            self.COOKIES[key] = morsel.value
 
         uri_bits = self.split_uri(self.raw_uri)
         domain_bits = uri_bits.get("netloc", ":").split(":", 1)
@@ -385,6 +403,7 @@ class HttpRequest(object):
                 present.
         """
         headers = {}
+        cookies = {}
         non_http_prefixed_headers = [
             "CONTENT-TYPE",
             "CONTENT-LENGTH",
@@ -400,7 +419,10 @@ class HttpRequest(object):
         for key, value in environ.items():
             mangled_key = key.replace("_", "-")
 
-            if mangled_key.startswith("HTTP-"):
+            if mangled_key == COOKIE_HEADER:
+                cookies = http.cookies.SimpleCookie()
+                cookies.load(value)
+            elif mangled_key.startswith("HTTP-"):
                 headers[mangled_key[5:]] = value
             elif mangled_key in non_http_prefixed_headers:
                 headers[mangled_key] = value
@@ -426,6 +448,7 @@ class HttpRequest(object):
             port=environ.get("SERVER_PORT", "80"),
             content_length=content_length,
             request_protocol=environ.get("SERVER_PROTOCOL", "HTTP/1.0"),
+            cookies=cookies,
         )
 
     def content_type(self):
@@ -556,6 +579,7 @@ class HttpResponse(object):
         self.status_code = int(status_code)
         self.headers = headers or {}
         self.content_type = content_type
+        self._cookies = http.cookies.SimpleCookie()
         self.start_response = None
 
         self.set_header("Content-Type", self.content_type)
@@ -581,6 +605,97 @@ class HttpResponse(object):
 
         if name.lower() == "content-type":
             self.content_type = value
+
+    def set_cookie(
+        self,
+        key,
+        value="",
+        max_age=None,
+        expires=None,
+        path="/",
+        domain=None,
+        secure=False,
+        httponly=False,
+        samesite=None,
+    ):
+        """
+        Sets a cookie on the response.
+
+        Takes the same parameters as the `http.cookies.Morsel` object from
+        the Python stdlib.
+
+        Args:
+            key (str): The name of the cookie.
+            value (Any): The value of the cookie.
+            max_age (int, Optional): How many seconds the cookie lives for.
+                Default is `None`
+                (expires at the end of the browser session).
+            expires (str or datetime, Optional): A specific date/time (in
+                UTC) when the cookie should expire. Default is `None`
+                (expires at the end of the browser session).
+            path (str, Optional): The path the cookie is valid for.
+                Default is `"/"`.
+            domain (str, Optional): The domain the cookie is valid for.
+                Default is `None` (only the domain that set it).
+            secure (bool, Optional): If the cookie should only be served by
+                HTTPS. Default is `False`.
+            httponly (bool, Optional): If `True`, prevents the cookie from
+                being provided to Javascript requests. Default is `False`.
+            samesite (str, Optional): How the cookie should behave under
+                cross-site requests. Options are `itty3.SAME_SITE_NONE`,
+                `itty3.SAME_SITE_LAX`, and `itty3.SAME_SITE_STRICT`.
+                Default is `None`.
+                Only for Python 3.8+.
+        """
+        morsel = http.cookies.Morsel()
+        # TODO: In the future, signed cookies might be nice here.
+        morsel.set(key, value, value)
+
+        # Allow setting expiry w/ a `datetime`.
+        if hasattr(expires, "strftime"):
+            expires = expires.strftime("%a, %-d %b %Y %H:%M:%S GMT")
+
+        # Always update the meaningful params.
+        morsel.update({"path": path, "secure": secure, "httponly": httponly})
+
+        # Ensure the max-age is an `int`.
+        if max_age is not None:
+            morsel["max-age"] = int(max_age)
+
+        if expires is not None:
+            morsel["expires"] = expires
+
+        if domain is not None:
+            morsel["domain"] = domain
+
+        if PY_VERSION[1] >= 8 and samesite is not None:
+            # `samesite` is only supported in Python 3.8+.
+            morsel["samesite"] = samesite
+
+        self._cookies[key] = morsel
+
+    def delete_cookie(self, key, path="/", domain=None):
+        """
+        Removes a cookie.
+
+        Succeed regards if the cookie is already set or not.
+
+        Args:
+            key (str): The name of the cookie.
+            path (str, Optional): The path the cookie is valid for.
+                Default is `"/"`.
+            domain (str, Optional): The domain the cookie is valid for.
+                Default is `None` (only the domain that set it).
+        """
+        self.set_cookie(
+            key,
+            value="",
+            # We set a Max-Age of `0` to expire the cookie immediately,
+            # thus "deleting" it.
+            max_age=0,
+            path=path,
+            domain=domain,
+        )
 
     def write(self):
         """
@@ -608,7 +723,15 @@ class HttpResponse(object):
             self.status_code,
             RESPONSE_CODES.get(self.status_code, RESPONSE_CODES[500]),
         )
-        self.start_response(status, [(k, v) for k, v in self.headers.items()])
+        headers = [(k, v) for k, v in self.headers.items()]
+        possible_cookies = self._cookies.output()
+
+        # Update the headers to include the cookies.
+        if possible_cookies:
+            for line in possible_cookies.splitlines():
+                headers.append(tuple(line.split(": ", 1)))
+
+        self.start_response(status, headers)
         return [self.body.encode("utf-8")]
 
 
@@ -676,6 +799,9 @@ class Route(object):
 
     def get_re_for_slug(self):
         return r"[\w\d._-]+"
+
+    def get_re_for_any(self):
+        return r".+"
 
     def get_re_for_type(self, desired_type):
         """
@@ -811,6 +937,8 @@ class App(object):
     def __init__(self, debug=False):
         self._routes = []
         self.debug = debug
+        self.static_root = None
+        self.static_url_path = None
         self.log = self.get_log()
 
     def get_log(self):
@@ -962,6 +1090,63 @@ class App(object):
             headers={"Location": url},
             status_code=status_code,
             content_type=PLAIN,
+        )
+
+    def render_static(self, request, asset_path):
+        """
+        Handles serving static assets.
+
+        WARNING: This should really only be used in development!
+
+        It's slow (compared to nginx, Apache or whatever), it hasn't gone
+        through any security assessments (which means potential security
+        holes), it's imperfect w/ regard to mimetypes.
+
+        Args:
+            request (HttpRequest): The request being handled
+            asset_path (str): A path of the asset to be served
+
+        Returns:
+            HttpResponse: The populated response object
+        """
+        if not self.static_root:
+            return self.error_404(request)
+
+        # First, we remove any relative nonsense from the path.
+        cleaned_path = os.path.normpath(asset_path)
+        cleaned_static_root = os.path.abspath(self.static_root)
+        # Then force it under the static root, so that escaping outside
+        # the static root shouldn't be do-able.
+        path = os.path.join(cleaned_static_root, cleaned_path)
+
+        # If it doesn't exist, immediately return a 404.
+        if not os.path.exists(path):
+            return self.error_404(request)
+
+        # Attempt to work out the content-type.
+        content_type = PLAIN
+        mtype, menc = mimetypes.guess_type(asset_path)
+
+        if mtype is not None:
+            content_type = mtype
+
+        # Actually read the file & decode it to bytes.
+        with open(path, "rb") as raw_file:
+            content = raw_file.read()
+            content_length = len(content)
+
+            if content_type.startswith(
+                "application"
+            ) or content_type.startswith("text"):
+                content = content.decode("utf-8")
+
+        # Approximate the content-length.
+        headers = {
+            "Content-Length": content_length,
+        }
+
+        return self.render(
+            request, content, content_type=content_type, headers=headers
         )
 
     def error_404(self, request):
@@ -1228,7 +1413,14 @@ class App(object):
         self.log.setLevel(level)
         return NoStdErrHandler
 
-    def run(self, addr="127.0.0.1", port=8000, debug=None):
+    def run(
+        self,
+        addr="127.0.0.1",
+        port=8000,
+        debug=None,
+        static_url_path=None,
+        static_root=None,
+    ):
         """
         An included development/debugging server for running the `App`
         itself.
@@ -1243,6 +1435,12 @@ class App(object):
             debug (bool, Optional): Whether the server should be run in a
                 debugging mode. If provided, this overrides the `App.debug`
                 set during initialization.
+            static_url_path (str, Optional): The desired URL prefix for
+                static assets. e.g. `/static/`. Defaults to `None` (no static
+                serving).
+            static_root (str, Optional): The filesystem path to the static
+                assets. e.g. `../static_assets`. Can be either a relative or
+                absolute path. Defaults to `None` (no static serving).
         """
         import sys
         from wsgiref.simple_server import make_server
@@ -1251,6 +1449,14 @@ class App(object):
 
         if self.debug is not None:
             self.debug = bool(debug)
+
+        if static_root and static_url_path:
+            self.static_root = static_root
+            self.static_url_path = static_url_path
+            url = urllib.parse.urljoin(
+                self.static_url_path, "<any:asset_path>"
+            )
+            self.add_route(GET, url, self.render_static)
 
         httpd = make_server(
             addr, port, self.process_request, handler_class=handler
