@@ -23,7 +23,8 @@ __author__ = "Daniel Lindsley"
 __version__ = (
     1,
     1,
-    0,
+    1,
+    "develop",
 )
 __license__ = "New BSD"
 
