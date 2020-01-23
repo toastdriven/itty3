@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## 1.1.0
+
+### Features
+
+* Added static assets support for development
+* Added cookies support
+
+## Documentation
+
+* Documentation for serving static assets
+* Documentation for using cookies
+
+
 ## 1.0.0
 
 Whoo! :tada:
