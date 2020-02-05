@@ -1143,7 +1143,7 @@ class App(object):
 
         # Approximate the content-length.
         headers = {
-            "Content-Length": content_length,
+            "Content-Length": str(content_length),
         }
 
         return self.render(
