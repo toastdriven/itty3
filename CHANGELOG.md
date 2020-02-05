@@ -1,6 +1,11 @@
 # CHANGELOG
 
 
+## 1.1.2-develop
+
+TBD
+
+
 ## 1.1.1
 
 Bugfix release.
