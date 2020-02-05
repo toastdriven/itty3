@@ -1,9 +1,14 @@
 # CHANGELOG
 
 
-## 1.1.1-develop
+## 1.1.1
 
-TBD
+Bugfix release.
+
+### Bugfixes
+
+* Altered the `static` handler provide `Content-Length` as a string, which
+  avoids crashing under `wsgiref`
 
 
 ## 1.1.0
@@ -13,7 +18,7 @@ TBD
 * Added static assets support for development
 * Added cookies support
 
-## Documentation
+### Documentation
 
 * Documentation for serving static assets
 * Documentation for using cookies
