@@ -24,7 +24,6 @@ __version__ = (
     1,
     1,
     1,
-    "develop",
 )
 __license__ = "New BSD"
 
