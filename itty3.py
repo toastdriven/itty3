@@ -23,7 +23,8 @@ __author__ = "Daniel Lindsley"
 __version__ = (
     1,
     1,
-    0,
+    1,
+    "develop",
 )
 __license__ = "New BSD"
 
@@ -1142,7 +1143,7 @@ class App(object):
 
         # Approximate the content-length.
         headers = {
-            "Content-Length": content_length,
+            "Content-Length": str(content_length),
         }
 
         return self.render(

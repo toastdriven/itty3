@@ -145,7 +145,8 @@ class TestApp(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.content_type, "text/css")
         self.assertEqual(
-            resp.headers, {"Content-Type": "text/css", "Content-Length": 146},
+            resp.headers,
+            {"Content-Type": "text/css", "Content-Length": "146"},
         )
         self.assertTrue(resp.body.startswith("/* Reset"))
 
@@ -166,7 +167,7 @@ class TestApp(unittest.TestCase):
         self.assertEqual(resp.content_type, "image/png")
         self.assertEqual(
             resp.headers,
-            {"Content-Type": "image/png", "Content-Length": 1473},
+            {"Content-Type": "image/png", "Content-Length": "1473"},
         )
 
     def test_error_404(self):
